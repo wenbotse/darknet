@@ -1,8 +1,13 @@
 #include "darknet.h"
 
+#include <dirent.h>
+#include <string.h>
 #include <time.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 extern void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top);
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
@@ -381,6 +386,18 @@ void visualize(char *cfgfile, char *weightfile)
 #endif
 }
 
+char* generator_outfilename(char *s1, char *s2)  
+{  
+    char *result = malloc(strlen(s1)+strlen(s2)+1);//+1 for the zero-terminator  
+    //in real code you would check for errors in malloc here  
+    if (result == NULL) exit (1);  
+  
+    strcpy(result, s1);  
+    strcat(result, s2);  
+  
+    return result;  
+}
+
 int main(int argc, char **argv)
 {
     //test_resize("data/bad.jpg");
@@ -417,8 +434,41 @@ int main(int argc, char **argv)
         float thresh = find_float_arg(argc, argv, "-thresh", .24);
         char *filename = (argc > 4) ? argv[4]: 0;
         char *outfile = find_char_arg(argc, argv, "-out", 0);
-        int fullscreen = find_arg(argc, argv, "-fullscreen");
-        test_detector("cfg/coco.data", argv[2], argv[3], filename, thresh, .5, outfile, fullscreen);
+	DIR *dp;
+
+	struct dirent *entry;
+	while(1)
+	{    
+		if((dp = opendir(filename)) == NULL) {
+		   printf("dir not exist %s \n",filename);
+                   sleep(1);continue; 
+		}
+		int cnt = 0;
+                while((entry = readdir(dp)) != NULL) {
+			if(strlen(entry->d_name)<=2)continue;
+			char* imagename = entry->d_name;
+			printf("begin to check jpg=%s \n",imagename);
+			//cnt++;
+	        	char* infilename = generator_outfilename(generator_outfilename(filename,"/"),imagename);
+			if( (access(generator_outfilename(infilename,".done"), 0 )) == -1 ){
+				printf(" image=%s not download completed  sleep 1 sec\n",infilename);
+				sleep(1);
+				continue;
+			}
+			cnt++;
+        		//char *outfile = find_char_arg(argc, argv, "-out", 0);
+			//char* infilename = generator_outfilename(generator_outfilename(filename,"/"),imagename);
+         		char* outfilename = generator_outfilename(generator_outfilename(outfile,"/"),imagename);
+			int fullscreen = find_arg(argc, argv, "-fullscreen");
+        		test_detector("cfg/coco.data", argv[2], argv[3], infilename, thresh, .5, outfilename, fullscreen);
+			printf("finish detect image %s \n",filename);
+			unlink(infilename);
+		}
+		if(cnt==0){
+			printf(" no image to detect int dir %s\n",filename);
+			sleep(1);
+		}
+       }
     } else if (0 == strcmp(argv[1], "cifar")){
         run_cifar(argc, argv);
     } else if (0 == strcmp(argv[1], "go")){

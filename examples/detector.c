@@ -578,6 +578,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     int j;
     float nms=.3;
     while(1){
+        printf("begin to detect ....\n");
         if(filename){
             strncpy(input, filename, 256);
         } else {
