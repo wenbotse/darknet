@@ -463,6 +463,9 @@ int main(int argc, char **argv)
         		test_detector("cfg/coco.data", argv[2], argv[3], infilename, thresh, .5, outfilename, fullscreen);
 			printf("finish detect image %s \n",filename);
 			unlink(infilename);
+			unlink(generator_outfilename(infilename,".done"));
+			int fd = open(generator_outfilename(outfilename,".done"),O_CREAT,0777);
+			close(fd);
 		}
 		if(cnt==0){
 			printf(" no image to detect int dir %s\n",filename);
