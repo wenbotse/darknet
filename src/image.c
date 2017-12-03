@@ -235,10 +235,21 @@ image **load_alphabet()
     return alphabets;
 }
 
+void writeLine(const char *fileName,const char *content)
+{
+	FILE *fp;
+	if ((fp=fopen(fileName,"a"))==NULL)
+	{
+		printf("Open Failed.\n");
+		return;
+	} 
+	fprintf(fp,"%s\n",content);
+	fclose(fp);
+}
+
 void draw_detections(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes)
 {
     int i,j;
-
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
         int class = -1;
@@ -251,9 +262,10 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
                     strcat(labelstr, ", ");
                     strcat(labelstr, names[j]);
                 }
-                printf("%s: %.0f%%\n", names[j], probs[i][j]*100);
+                printf("i=%d,j=%d %s: %.0f%%\n",i, j, names[j], probs[i][j]*100);
             }
         }
+	
         if(class >= 0){
             int width = im.h * .006;
 
@@ -307,6 +319,85 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
     }
 }
 
+void draw_detections_prob(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes, char* prob_file)
+{
+    printf("./src/image.c(324) draw_detections_prob thresh=%f\n", thresh);
+    if(thresh <= 0){
+        thresh = 0.24;
+     }
+    int i,j;
+    FILE *fp; 
+    fp=fopen(prob_file, "a");
+    for(i = 0; i < num; ++i){
+        char labelstr[4096] = {0};
+        int class = -1;
+        for(j = 0; j < classes; ++j){
+            if (probs[i][j] > thresh){
+                if (class < 0) {
+                    strcat(labelstr, names[j]);
+                    class = j;
+                } else {
+                    strcat(labelstr, ", ");
+                    strcat(labelstr, names[j]);
+                }
+		fprintf(fp,"%s: %.0f%%\n",names[j], probs[i][j]*100);
+                printf("thresh=%f,i=%d,j=%d %s: %.0f%%\n",thresh, i, j, names[j], probs[i][j]*100);
+            }
+        }
+	
+        if(class >= 0){
+            int width = im.h * .006;
+
+            /*
+               if(0){
+               width = pow(prob, 1./2.)*10+1;
+               alphabet = 0;
+               }
+             */
+
+            //printf("%d %s: %.0f%%\n", i, names[class], prob*100);
+            int offset = class*123457 % classes;
+            float red = get_color(2,offset,classes);
+            float green = get_color(1,offset,classes);
+            float blue = get_color(0,offset,classes);
+            float rgb[3];
+
+            //width = prob*20+2;
+
+            rgb[0] = red;
+            rgb[1] = green;
+            rgb[2] = blue;
+            box b = boxes[i];
+
+            int left  = (b.x-b.w/2.)*im.w;
+            int right = (b.x+b.w/2.)*im.w;
+            int top   = (b.y-b.h/2.)*im.h;
+            int bot   = (b.y+b.h/2.)*im.h;
+
+            if(left < 0) left = 0;
+            if(right > im.w-1) right = im.w-1;
+            if(top < 0) top = 0;
+            if(bot > im.h-1) bot = im.h-1;
+
+            draw_box_width(im, left, top, right, bot, width, red, green, blue);
+            if (alphabet) {
+                image label = get_label(alphabet, labelstr, (im.h*.03)/10);
+                draw_label(im, top + width, left, label, rgb);
+                free_image(label);
+            }
+            if (masks){
+                image mask = float_to_image(14, 14, 1, masks[i]);
+                image resized_mask = resize_image(mask, b.w*im.w, b.h*im.h);
+                image tmask = threshold_image(resized_mask, .5);
+                embed_image(tmask, im, left, top);
+                free_image(mask);
+                free_image(resized_mask);
+                free_image(tmask);
+            }
+        }
+    }
+    fclose(fp);
+}
 void transpose_image(image im)
 {
     assert(im.w == im.h);
@@ -666,7 +757,7 @@ void save_image_png(image im, const char *name)
 {
     char buff[256];
     //sprintf(buff, "%s (%d)", name, windows);
-    sprintf(buff, "%s.png", name);
+    sprintf(buff, "%s", name);
     unsigned char *data = calloc(im.w*im.h*im.c, sizeof(char));
     int i,k;
     for(k = 0; k < im.c; ++k){

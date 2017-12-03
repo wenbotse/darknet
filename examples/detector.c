@@ -567,7 +567,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     list *options = read_data_cfg(datacfg);
     char *name_list = option_find_str(options, "names", "data/names.list");
     char **names = get_labels(name_list);
-
+    printf("./examples/detector.c(570)  thresh=%f \n",thresh);	
+    	
     image **alphabet = load_alphabet();
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
@@ -578,6 +579,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     int j;
     float nms=.3;
     while(1){
+        printf("begin to detect ....\n");
         if(filename){
             strncpy(input, filename, 256);
         } else {
@@ -608,10 +610,13 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         time=what_time_is_it_now();
         network_predict(net, X);
         printf("%s: Predicted in %f seconds.\n", input, what_time_is_it_now()-time);
-        get_region_boxes(l, im.w, im.h, net->w, net->h, thresh, probs, boxes, masks, 0, 0, hier_thresh, 1);
-        if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+        char* prob_file = generator_outfilename(outfile,".txt");
+	get_region_boxes(l, im.w, im.h, net->w, net->h, thresh, probs, boxes, masks, 0, 0, hier_thresh, 1);
+        printf("get region box \n");
+	if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         //else if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
-        draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, masks, names, alphabet, l.classes);
+	printf("examples/detector.c(618) draw_detections_prob thresh=%f\n", thresh);
+	draw_detections_prob(im, l.w*l.h*l.n, thresh, boxes, probs, masks, names, alphabet, l.classes, prob_file);
         if(outfile){
             save_image(im, outfile);
         }
